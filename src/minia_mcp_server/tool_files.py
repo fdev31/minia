@@ -35,11 +35,14 @@ def read_file(file_path: str, start_line, line_count=20) -> str:
     total_lines = len(all_lines)
     file_size = len(content.encode("utf-8"))
 
-    start_line = int(start_line)
+    start_line = int(start_line) - 1
     line_count = int(line_count)
 
+    if start_line < 1:
+        raise ToolError("start_line starts counting at 1")
+
     if start_line > total_lines:
-        raise ToolError(f"Offset {start_line} exceeds total lines {total_lines}.")
+        raise ToolError(f"start_line={start_line} exceeds total {total_lines} lines.")
 
     shown_lines = all_lines[start_line : start_line + line_count]
     shown_text = "".join(shown_lines)
