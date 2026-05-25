@@ -1,0 +1,40 @@
+---
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Ruff version.
+    rev: "v0.14.14"
+    hooks:
+      # Run the linter.
+      - id: ruff-check
+      - id: ruff-format
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: "v6.0.0"
+    hooks:
+      - id: check-yaml
+      - id: check-json
+      - id: pretty-format-json
+        args: ['--autofix', '--no-sort-keys']
+  - repo: https://github.com/lovesegfault/beautysh
+    rev: "v6.4.2"
+    hooks:
+      - id: beautysh
+  - repo: https://github.com/adrienverge/yamllint
+    rev: "v1.38.0"
+    hooks:
+      - id: yamllint
+
+  - repo: local
+    hooks:
+      - id: run-pytest
+        name: Run pytest
+        entry: uv run pytest tests
+        pass_filenames: false
+        language: system
+        stages: [pre-push]
+
+      - id: run-mypy
+        name: Run type checks
+        entry: uv run mypy --follow-imports=skip --check-untyped-defs
+        exclude: ^(tests|integration-tests)/
+        language: system
+        types: [python]

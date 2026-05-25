@@ -1,0 +1,80 @@
+[project]
+name = "minia"
+version = "0.1.0"
+description = "Your mini AI"
+readme = "README.md"
+requires-python = "==3.13.*"
+dependencies = [
+    "openai>=2.37.0",
+    "prompt_toolkit>=3.0.0",
+    "requests>=2.34.2",
+    "rich>=15.0.0",
+    "tiktoken>=0.7.0",
+    "aiohttp>=3.9.0",
+    "unidic>=1.1.0",
+]
+
+[project.scripts]
+minia = "minia_mother_forker.mother_forker:main"
+minia-client = "minia_client.cli:main"
+
+minia-server = "minia.main:main"
+minia-mcp-server = "minia_mcp_server.main:mcp_server_main"
+minia-tts = "minia_tts.server:main"
+minia-tts-client = "minia_tts.cli:main"
+minia-chatloop = "minia_chatloop.main:main"
+minia-stt = "minia_stt.main:main"
+minia-web = "minia_web.server:main"
+
+[project.optional-dependencies]
+mcp = [
+    "ddgs>=9.14.4",
+    "gitignore-parser>=0.1.13",
+    "html2text>=2025.4.15",
+    "mcp>=1.27.1",
+    "diff-match-patch>=20241021",
+]
+
+jp = [
+    "phonemizer-fork>=3.3.2",  # misaki[en] expects this, not phonemizer
+    "fugashi>=1.5.2",           # kokoro/misaki Japanese pipeline (JA g2p)
+    "unidic>=1.0.1",            # fugashi Japanese dictionary (provides DICDIR)
+    "pyopenjtalk>=0.4.1",       # misaki Japanese text processing
+    "mojimoji>=0.0.13",         # misaki Japanese character conversion
+    "jaconv>=0.5.0",            # misaki Japanese normalization
+]
+tts = [
+    "kokoro>=0.9.0",
+    "numpy>=1.24.0",
+    "huggingface-hub>=0.20.0",
+    "sounddevice>=0.4.0",
+    "langid>=1.1.6",
+]
+stt = [
+    # "openwakeword>=0.4.0,<0.5.0",  # >=0.5 requires tflite-runtime (no Python 3.12+ wheels)
+    "openai-whisper>=20230314",
+    "sounddevice>=0.4.0",
+    "numpy>=1.24.0",
+]
+dev = [
+    "mypy>=2.1.0",
+    "pytest>=9.0.3",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.15.14",
+    #"mitmproxy>=12.2.3",
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[[tool.mypy.overrides]]
+module = ["openapi.*", 'kokoro.*', 'langid.*', 'whisper.*', 'gitignore_parser.*']
+follow_untyped_imports = true

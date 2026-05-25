@@ -1,0 +1,17 @@
+# Python bytecode & package metadata
+__pycache__/
+*.egg-info/
+
+# Environment & secrets
+.env
+credentials.json
+
+# Logs (anywhere in the repo)
+**/*.log
+**/*.log.*
+
+# Project-specific
+.opencode/
+skills/
+
+PLAN.md

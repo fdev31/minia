@@ -1,0 +1,14 @@
+[Unit]
+Description=Minia Server Service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/fab/dev/std/minia
+ExecStart=uv run minia-server
+Restart=on-failure
+RestartSec=5
+#StandardOutput=append:/home/fab/dev/std/minia/minia-server.log
+#StandardError=append:/home/fab/dev/std/minia/minia-server.log
+
+[Install]
+WantedBy=default.target

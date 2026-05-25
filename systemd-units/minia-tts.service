@@ -1,0 +1,14 @@
+[Unit]
+Description=Minia TTS Service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/fab/dev/std/minia
+ExecStart=uv run minia-tts
+Restart=on-failure
+RestartSec=5
+#StandardOutput=append:/home/fab/dev/std/minia/minia-tts.log
+#StandardError=append:/home/fab/dev/std/minia/minia-tts.log
+
+[Install]
+WantedBy=default.target
