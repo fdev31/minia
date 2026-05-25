@@ -10,7 +10,9 @@ from minia_protocol import EventType
 from .model import ResponseData, LlmContext
 from . import compaction
 from minia_config import config
-from .logger import logger
+from minia_utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 # How often to poll for cancellation signals during tool execution (seconds)
 _TOOL_POLL_INTERVAL = 0.1

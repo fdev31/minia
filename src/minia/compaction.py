@@ -3,9 +3,11 @@ import json
 from .llm_client import get_client
 from minia_config import config
 from .model import LlmContext
-from .logger import logger
 from .serialization import ToolResult, serialize
 from minia import prompts
+from minia_utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 THINKING_OPEN = "<think>"
 THINKING_CLOSE = "</think>"

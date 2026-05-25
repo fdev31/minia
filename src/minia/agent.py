@@ -3,7 +3,9 @@ from .model import LlmContext
 from . import response_stream
 from . import compaction
 from . import token_estimation
-from .logger import logger
+from minia_utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class Agent:

@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import logging
 from collections.abc import Sequence
 
 from minia_config import config
@@ -24,7 +23,9 @@ from .utils import (
     build_system_prompt,
 )
 
-logger = logging.getLogger(__name__)
+from minia_utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 def _resolve_server_names(servers: Sequence[dict | object]) -> list[str]:
@@ -49,8 +50,16 @@ async def process_delegation(
 ):
     task_instruction = args.get("task_instruction", "")
     suggested_tool = args.get("tool")
+    worker_type = args.get("worker_type", config.llm.worker_default)
 
-    if suggested_tool:
+    if worker_type != config.llm.worker_default:
+        logger.info(
+            "[Manager] Delegating to Worker (type: %s, tool: %s): '%s'",
+            worker_type,
+            suggested_tool,
+            task_instruction,
+        )
+    elif suggested_tool:
         logger.info(
             "[Manager] Delegating to Worker (tool: %s): '%s'",
             suggested_tool,
@@ -59,7 +68,9 @@ async def process_delegation(
     else:
         logger.info("[Manager] Delegating to Worker: '%s'", task_instruction)
 
-    worker = McpWorker(all_clients, suggested_tool=suggested_tool)
+    worker = McpWorker(
+        all_clients, suggested_tool=suggested_tool, worker_type=worker_type
+    )
     result = await worker.run(task_instruction)
     return result
 
@@ -97,8 +108,11 @@ async def _main():
             )
 
         direct_tool_names = {"read_file_lines"}
+        worker_type_names = [wt.name for wt in config.llm.worker_types] or ["default"]
         manager_tools_schema = (
-            build_manager_tools_schema(mcp_clients, direct_tool_names)
+            build_manager_tools_schema(
+                mcp_clients, direct_tool_names, worker_type_names
+            )
             if mcp_clients
             else [{}]
         )

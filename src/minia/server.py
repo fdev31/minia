@@ -12,7 +12,9 @@ from minia_protocol import EventType
 from minia_sockets.server import SOCKET_DISCONNECT_ERRORS
 from .llm_client import TimeoutError, ConnectionError
 from . import compaction
-from .logger import logger
+from minia_utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 # ---------------------------------------------------------------------------

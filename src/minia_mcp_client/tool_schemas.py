@@ -23,10 +23,16 @@ LOAD_TOOL_SCHEMA: dict = {
 
 def build_delegate_task_schema(
     tool_descriptions: list[tuple[str, str]],
+    worker_types: list[str] | None = None,
 ) -> dict:
     """Return the delegate_task tool schema for a manager."""
     enum_values = [name for name, _ in tool_descriptions]
     properties: dict[str, dict] = {
+        "worker_type": {
+            "type": "string",
+            "description": "Worker type to use for this task.",
+            "enum": worker_types or ["default"],
+        },
         "tool": {
             "type": "string",
             "description": "The tool to use.",

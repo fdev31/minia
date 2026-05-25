@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import logging
 from typing import Awaitable, Callable
 
 from .agent import Agent
@@ -14,8 +13,9 @@ from minia_mcp_client.tool_schemas import (
     build_direct_tool_schemas,
 )
 from .model import LlmContext
+from minia_utils.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def build_tool_executor(
@@ -75,17 +75,75 @@ def build_tool_executor(
     return executor
 
 
-def build_worker_tools_schema() -> list[dict]:
-    """Build tool schemas for a worker agent."""
-    return [LOAD_TOOL_SCHEMA]
+def _matches_patterns(name: str, patterns: list[str]) -> bool:
+    """Check if a tool name matches any of the given patterns.
+
+    Patterns are matched against the full 'server:tool_name' string.
+    Uses simple substring matching: a pattern matches if it appears
+    anywhere in the tool name.
+    """
+    for pattern in patterns:
+        if pattern in name:
+            return True
+    return False
+
+
+def build_worker_tools_schema(
+    all_clients: list[McpClient],
+    whitelist: list[str] | None = None,
+    blacklist: list[str] | None = None,
+) -> list[dict]:
+    """Build tool schemas for a worker agent, filtered by whitelist/blacklist.
+
+    Filters match against the full 'server:tool_name' name.
+    Empty whitelist means no restriction. Empty blacklist means no exclusion.
+    Always includes LOAD_TOOL_SCHEMA.
+    """
+    tools: list[dict] = [LOAD_TOOL_SCHEMA]
+
+    for client in all_clients:
+        for name, desc in client.tool_descriptions:
+            full_name = f"{client.server_id}:{name}"
+
+            if whitelist and not _matches_patterns(full_name, whitelist):
+                continue
+            if blacklist and _matches_patterns(full_name, blacklist):
+                continue
+
+            schema = client.get_tool_schema(name)
+            if schema is None:
+                continue
+
+            tools.append(
+                {
+                    "type": "function",
+                    "function": {
+                        "name": full_name,
+                        "description": schema["function"]["description"],
+                        "parameters": {
+                            "type": "object",
+                            "properties": schema["function"]
+                            .get("parameters", {})
+                            .get("properties", {}),
+                            "required": schema["function"]
+                            .get("parameters", {})
+                            .get("required", []),
+                        },
+                    },
+                }
+            )
+
+    return tools
 
 
 def build_manager_tools_schema(
-    mcp_clients: list[McpClient], direct_tool_names: set[str]
+    mcp_clients: list[McpClient],
+    direct_tool_names: set[str],
+    worker_types: list[str] | None = None,
 ) -> list[dict]:
     """Build tool schemas for the manager agent."""
     all_descriptions = build_all_tool_descriptions(mcp_clients)
-    manager_tools = [build_delegate_task_schema(all_descriptions)]
+    manager_tools = [build_delegate_task_schema(all_descriptions, worker_types)]
     manager_tools.append(LOAD_TOOL_SCHEMA)
     for mcp_client in mcp_clients:
         manager_tools.extend(build_direct_tool_schemas(mcp_client, direct_tool_names))

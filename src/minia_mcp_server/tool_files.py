@@ -21,7 +21,7 @@ def touch_file(file_path: str):
 
 
 @mcp.tool()
-def read_file(file_path: str, start_line=0, line_count=20) -> str:
+def read_file(file_path: str, start_line, line_count=20) -> str:
     """Read lines from a file. Returns content with metadata header."""
     if not os.path.exists(file_path):
         raise ToolError(f"File not found at {file_path}")
