@@ -22,6 +22,8 @@ def read_file(file_path: str, offset=0, limit=20) -> str:
             return f"Error: File not found at {file_path}"
         if is_binary(file_path):
             return "Error: File is binary and cannot be read as text."
+        if os.path.isdir(file_path):
+            return "OPERATION FAILED: You can not read a directory, list its content instead"
 
         content = read_text(file_path)
         all_lines = content.splitlines(keepends=True)
@@ -153,29 +155,30 @@ def list_files(
     artifacts (__pycache__, node_modules, .venv, etc.), and files listed in
     .gitignore.  Use ``include_hidden=True`` to override these defaults.
     """
-    max_files = 30
+    max_files = 40
+    files = []
     try:
         if not is_safe_path(dir_path):
-            return "Error: Access denied."
+            return "error: Access denied."
         if not os.path.exists(dir_path):
-            return f"ERROR: Directory not found at {dir_path}"
+            return f"error: Directory not found at {dir_path}"
         if not os.path.isdir(dir_path):
-            return f"ERROR: {dir_path} is not a directory."
+            return f"error: {dir_path} is not a directory."
 
         if recursive:
-            files = []
             for rel_path in list_files_filtered(
                 dir_path, include_hidden=include_hidden
             ):
                 files.append(rel_path)
                 if len(files) >= max_files:
-                    return f"Error: Too many files found. Limit is {max_files}. Consider narrowing your search."
+                    return f"error: Too many files found. Limit is {max_files}. Consider narrowing your search."
 
-            return "\n".join(files)
         else:
-            return "\n".join(os.listdir(dir_path))
+            files = os.listdir(dir_path)
     except Exception as e:
-        return f"Error: {str(e)}"
+        return "error:" + str(e)
+    else:
+        return f"ls {dir_path}:{'\n'.join(files)}"
 
 
 @mcp.tool()

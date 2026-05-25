@@ -170,7 +170,6 @@ def extract_python_project_structure(
     code snippets (first 5 lines of each body).
 
     Note: This tool shows structure and snippets, not full file content.
-    Use read_file for complete file contents.
     """
     if not is_safe_path(file_path):
         return {"error": "Access denied."}

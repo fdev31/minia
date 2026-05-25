@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+from collections.abc import Sequence
 
 from minia_config import config
 from minia import prompts
@@ -26,12 +27,12 @@ from .utils import (
 logger = logging.getLogger(__name__)
 
 
-def _resolve_server_names(servers: list[dict]) -> list[str]:
+def _resolve_server_names(servers: Sequence[dict | object]) -> list[str]:
     """Resolve unique server names from config, deduplicating with numeric suffixes."""
     name_counts: dict[str, int] = {}
     resolved: list[str] = []
     for server in servers:
-        base = server.get("name") or "service"
+        base = getattr(server, "name", None) or "service"
         if base not in name_counts:
             name_counts[base] = 0
             resolved.append(base)
@@ -95,7 +96,7 @@ async def _main():
                 len(mcp_client.tool_descriptions),
             )
 
-        direct_tool_names = {"read_file"}
+        direct_tool_names = {"read_file_lines"}
         manager_tools_schema = (
             build_manager_tools_schema(mcp_clients, direct_tool_names)
             if mcp_clients

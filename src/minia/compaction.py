@@ -101,6 +101,7 @@ async def summarize_message(
     try:
         response = await (await get_client()).chat.completions.create(
             model=ctx.model,
+            parallel_tool_calls=config.llm.parallel_tool_calls,
             messages=[{"role": "user", "content": summary_prompt}],
             max_tokens=config.llm.summary_max_tokens,
         )
@@ -202,6 +203,7 @@ async def compact_history(ctx: LlmContext, force: bool = False) -> str | None:
     try:
         response = await (await get_client()).chat.completions.create(
             model=ctx.model,
+            parallel_tool_calls=config.llm.parallel_tool_calls,
             messages=[
                 {"role": "user", "content": prompts.SUMMARY_PROMPT + summary_content}
             ],

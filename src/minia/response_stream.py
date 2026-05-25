@@ -165,6 +165,7 @@ async def stream_response(ctx: LlmContext):
         client = await get_client()
         response = await client.chat.completions.create(
             model=ctx.model,
+            parallel_tool_calls=config.llm.parallel_tool_calls,
             messages=ctx.history,
             tools=tools,
             tool_choice="auto",
@@ -250,6 +251,34 @@ async def stream_response(ctx: LlmContext):
         if answer_buf:
             yield ResponseData(type=EventType.TEXT, content=answer_buf)
 
+        # Deduplicate tool calls within this response (same name+args)
+        seen: set[tuple[str, str]] = set()
+        deduped: dict[int, dict[str, str]] = {}
+        duplicates: list[dict[str, str]] = []
+        for idx in sorted(acc_tools.keys()):
+            acc = acc_tools[idx]
+            key = (acc["name"], acc["args"])
+            if key in seen:
+                duplicates.append(acc)
+            else:
+                seen.add(key)
+                deduped[idx] = acc
+        if duplicates:
+            dup_names = [d["name"] for d in duplicates if d["name"]]
+            if dup_names:
+                logger.warning(
+                    "[%s] Dropping duplicate tool call(s): %s",
+                    ctx.name,
+                    ", ".join(dup_names),
+                )
+                ctx.history.append(
+                    {
+                        "role": "user",
+                        "content": "You requested the same tool call multiple times with identical arguments. Please focus on the plan and avoid repetitions.",
+                    }
+                )
+        acc_tools = deduped
+
         full_msg: dict[str, Any] = {
             "role": "assistant",
             "content": "".join(content_parts) or None,
@@ -271,13 +300,12 @@ async def stream_response(ctx: LlmContext):
                 type=EventType.THINKING,
                 content=f"[System] Loading schema for '{tname}'...",
             )
-            result = (
+            if ctx.tool_executor:
                 await _run_tool_with_polling(
                     ctx, "load_tool", json.loads(load_call["args"])
                 )
-                if ctx.tool_executor
-                else '{"error":"No executor"}'
-            )
+            else:
+                logger.warning("[%s] No executor for load_tool", ctx.name)
             yield ResponseData(
                 type=EventType.THINKING, content="[System] Schema loaded. Resending."
             )
@@ -289,7 +317,11 @@ async def stream_response(ctx: LlmContext):
                 }
             )
             ctx.history.append(
-                {"role": "tool", "tool_call_id": load_call["id"], "content": result}
+                {
+                    "role": "tool",
+                    "tool_call_id": load_call["id"],
+                    "content": f"Tool '{tname}' loaded and added to available tools.",
+                }
             )
             yield ResponseData(type=EventType.CHECK, content="")
             continue

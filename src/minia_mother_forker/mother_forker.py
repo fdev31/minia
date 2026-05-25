@@ -136,8 +136,8 @@ class MotherForker:
             )
 
         # 1. Start minia-server and minia-tts in parallel
-        server_socket = config.default["cmd_socket_path"]
-        event_socket = config.default["event_socket_path"]
+        server_socket = config.default.cmd_socket_path
+        event_socket = config.default.event_socket_path
         tts_socket = config.tts.cmd_socket_path
         tts_audio_socket = config.tts.audio_socket_path
 

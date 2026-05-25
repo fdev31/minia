@@ -12,7 +12,7 @@ LOAD_TOOL_SCHEMA: dict = {
             "properties": {
                 "tool_name": {
                     "type": "string",
-                    "description": "The name of the tool to load the full schema for (eg: service:read_file).",
+                    "description": "The name of the tool to load the full schema for (eg: service_name:function_name).",
                 }
             },
             "required": ["tool_name"],
