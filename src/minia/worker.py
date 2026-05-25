@@ -21,7 +21,11 @@ logger = logging.getLogger(__name__)
 def _build_worker_system_prompt(tool_descriptions: list[tuple[str, str]]) -> str:
     """Build the Worker's system prompt with tool list and folding instructions."""
     tool_list = build_tool_description_list(tool_descriptions)
-    base = build_system_prompt(prompts.WORKER_PROMPT, tool_list)
+    base = build_system_prompt(
+        prompts.WORKER_PROMPT,
+        tool_list,
+        tool_result_snippet=prompts.get_tool_result_snippet(config.llm.tool_format),
+    )
     base += "\nIMPORTANT: You can only use the load_tool function to discover tool schemas. "
     base += "Call load_tool with a tool_name to get its full schema before using it."
     return base

@@ -13,6 +13,8 @@ from mcp.client.session_group import (  # type: ignore[import-not-found]
 from mcp.types import TextContent  # type: ignore[import-not-found]
 
 from minia_utils.logging import get_logger
+from minia.serialization import ToolResult, serialize
+from minia_config import config
 
 logger = get_logger(__name__)
 
@@ -33,20 +35,25 @@ def _convert_tool_to_openai(mcp_tool) -> dict:
     }
 
 
-def _format_tool_result(result) -> str:
-    """Format a CallToolResult into a human-readable string."""
+def _format_tool_result(result, tool_name: str | None = None) -> str:
+    """Format a CallToolResult using the configured serialization format.
+
+    The structured format gives the LLM explicit signals about success/failure
+    and content boundaries, reducing tool call loops caused by ambiguous results.
+    """
     parts = []
     for content in result.content:
         if isinstance(content, TextContent):
             parts.append(content.text)
         else:
-            parts.append(
-                f"[{type(content).__name__}] {json.dumps(content.model_dump(), default=str)}"
-            )
-    text = "\n\n".join(parts)
-    if result.isError:
-        text = f"Error: {text}"
-    return text
+            parts.append(json.dumps(content.model_dump(), default=str))
+    content_text = "\n\n".join(parts)
+
+    status = "error" if result.isError else "success"
+    tool_result = ToolResult(
+        status=status, content=content_text, tool_name=tool_name or ""
+    )
+    return serialize(tool_result, config.llm.tool_format)
 
 
 class McpClient:
@@ -151,7 +158,9 @@ class McpClient:
         else:
             raise ValueError(f"Unknown transport: {self.transport}")
 
-    async def call_tool(self, name: str, args: dict | None = None) -> str:
+    async def call_tool(
+        self, name: str, args: dict | None = None, tool_name: str | None = None
+    ) -> str:
         """Call an MCP tool and return the formatted result."""
         if not self._group:
             raise RuntimeError(
@@ -164,7 +173,7 @@ class McpClient:
             json.dumps(args) if args else "None",
         )
         result = await self._group.call_tool(name, args)
-        formatted = _format_tool_result(result)
+        formatted = _format_tool_result(result, tool_name=tool_name)
         logger.debug(
             "[MCP] result | server=%s | tool=%s | error=%s | len=%d | preview=%s",
             self.server_id,

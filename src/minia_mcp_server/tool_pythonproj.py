@@ -1,4 +1,4 @@
-from .mcp_instance import mcp
+from .mcp_instance import mcp, ToolError
 from .utils import is_safe_path, read_text
 
 import ast
@@ -124,12 +124,12 @@ def _extract_file_info(file_path: str, include_docstrings: bool) -> dict:
     try:
         content = read_text(file_path)
     except Exception as e:
-        return {"error": f"Error reading file: {e}"}
+        raise ToolError(f"Error reading file: {e}")
 
     try:
         tree = ast.parse(content)
     except Exception as e:
-        return {"error": f"Error parsing file: {e}"}
+        raise ToolError(f"Error parsing file: {e}")
 
     source_lines = content.splitlines()
 
@@ -172,7 +172,7 @@ def extract_python_project_structure(
     Note: This tool shows structure and snippets, not full file content.
     """
     if not is_safe_path(file_path):
-        return {"error": "Access denied."}
+        raise ToolError("Access denied.")
 
     if os.path.isdir(file_path):
         py_files = []
@@ -182,15 +182,11 @@ def extract_python_project_structure(
                 if f.endswith(".py"):
                     py_files.append(os.path.join(root, f))
         if not py_files:
-            return {"error": "No Python files found"}
+            raise ToolError("No Python files found")
 
         files_data = {}
         for py_file in py_files:
-            info = _extract_file_info(py_file, include_docstrings)
-            if "error" in info:
-                info["text"] = f"Error: {info['error']}"
-                del info["error"]
-            files_data[py_file] = info
+            files_data[py_file] = _extract_file_info(py_file, include_docstrings)
 
         summary = _build_summary(files_data, file_path)
 
@@ -202,14 +198,12 @@ def extract_python_project_structure(
         }
 
     if not os.path.exists(file_path):
-        return {"error": f"File not found at {file_path}"}
+        raise ToolError(f"File not found at {file_path}")
 
     if not file_path.endswith(".py"):
-        return {"error": "File is not a Python file."}
+        raise ToolError("File is not a Python file.")
 
     info = _extract_file_info(file_path, include_docstrings)
-    if "error" in info:
-        return info
 
     return {
         "file": file_path,

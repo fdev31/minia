@@ -285,6 +285,16 @@ async def stream_response(ctx: LlmContext):
             "tool_calls": [],
         }
 
+        # Force text content alongside tool calls — the LLM must explain its actions
+        if acc_tools and full_msg["content"] is None:
+            ctx.history.append(
+                {
+                    "role": "user",
+                    "content": "You must always include text explaining your actions. Describe what you're about to do and why before calling tools.",
+                }
+            )
+            continue
+
         # Handle load_tool specially
         load_call = None
         other_calls = []

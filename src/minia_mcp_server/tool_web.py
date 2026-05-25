@@ -14,20 +14,14 @@ h2t.ignore_images = True
 @mcp.tool()
 def search_web(query: str, max_results: int = 5) -> list[dict]:
     """Search the web"""
-    try:
-        results = DDGS().text(query, max_results=int(max_results))
-        return list(results) if results else []
-    except Exception as e:
-        return [{"error": str(e)}]
+    results = DDGS().text(query, max_results=int(max_results))
+    return list(results) if results else []
 
 
 @mcp.tool()
 def read_web_page(url: str) -> str:
     """Fetch and convert web page to text"""
-    try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-        return str(h2t.handle(response.text))
-    except Exception as e:
-        return f"Error: {str(e)}"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    response = requests.get(url, headers=headers, timeout=10)
+    response.raise_for_status()
+    return str(h2t.handle(response.text))

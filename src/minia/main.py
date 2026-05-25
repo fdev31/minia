@@ -122,6 +122,7 @@ async def _main():
         composite_prompt = build_system_prompt(
             prompts.MANAGER_PROMPT,
             build_tool_description_list(all_tool_descriptions),
+            tool_result_snippet=prompts.get_tool_result_snippet(config.llm.tool_format),
         )
 
         composite_agent = create_agent(

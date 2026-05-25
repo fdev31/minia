@@ -23,8 +23,12 @@ _CONFIG_DIR = Path(
 def _load_toml_config() -> dict[str, Any]:
     """Load the TOML config file if it exists."""
     if _CONFIG_DIR.exists():
-        with open(_CONFIG_DIR, "rb") as f:
-            return tomllib.load(f)
+        try:
+            with open(_CONFIG_DIR, "rb") as f:
+                return tomllib.load(f)
+        except tomllib.TOMLDecodeError as e:
+            print(f"WARNING: Corrupted TOML config at {_CONFIG_DIR}: {e}")
+            print("Falling back to default settings.")
     return {}
 
 
@@ -87,7 +91,8 @@ class LlmSettings(BaseSettings):
     max_message_size: int = 100_000
     summary_max_tokens: int = 500
     compaction_max_tokens: int = 4_096
-    parallel_tool_calls: bool = False
+    parallel_tool_calls: bool = True
+    tool_format: str = "yaml"
 
     model_config = SettingsConfigDict(extra="allow")
 
@@ -192,6 +197,7 @@ class Settings(BaseSettings):
                 "max_message_size": 100_000,
                 "summary_max_tokens": 500,
                 "compaction_max_tokens": 4_096,
+                "tool_format": "yaml",
             },
             "tts": {
                 "cmd_socket_path": "/tmp/minia_tts_cmd.sock",

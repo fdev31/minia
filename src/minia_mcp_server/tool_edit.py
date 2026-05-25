@@ -4,7 +4,7 @@ import os
 from difflib import SequenceMatcher
 from typing import Optional
 
-from .mcp_instance import mcp
+from .mcp_instance import mcp, ToolError
 from .utils import is_binary, is_safe_path, read_text
 
 
@@ -31,21 +31,21 @@ def edit_file(
 ) -> str:
     """replace content with another in a text file"""
     if old_string == new_string:
-        return "Error: old_string and new_string are the same, no changes needed."
+        raise ToolError("old_string and new_string are the same, no changes needed.")
 
     if replace_all and occurrence:
-        return (
-            "Error: Cannot specify both replace_all and occurrence. Please choose one."
+        raise ToolError(
+            "Cannot specify both replace_all and occurrence. Please choose one."
         )
 
     if not is_safe_path(path):
-        return "Error: Access denied."
+        raise ToolError("Access denied.")
 
     content = read_text(str(path))
 
     count = content.count(old_string)
     if count == 0:
-        return "Error: old_string not found in file."
+        raise ToolError("old_string not found in file.")
 
     if replace_all:
         new_content = content.replace(old_string, new_string)
@@ -54,14 +54,12 @@ def edit_file(
         try:
             new_content = _replace_nth(content, old_string, new_string, occurrence)
         except ValueError as e:
-            return "Error: " + str(e)
+            raise ToolError(str(e))
         replaced = 1
     else:
         if count > 1:
-            return (
-                "Error: old_string is not unique in file. Found {} occurrences.".format(
-                    count
-                )
+            raise ToolError(
+                f"old_string is not unique in file. Found {count} occurrences."
             )
         new_content = content.replace(old_string, new_string, 1)
         replaced = 1
@@ -294,64 +292,62 @@ def edit_file_diff(file_path: str, diff: str) -> str:
     Fuzzy matching is used so minor typos won't cause failures.
     """
     if not is_safe_path(file_path):
-        return "Error: Access denied."
+        raise ToolError("Access denied.")
 
     if not os.path.exists(file_path):
-        return f"Error: File not found at {file_path}"
+        raise ToolError(f"File not found at {file_path}")
 
     if is_binary(file_path):
-        return "Error: File is binary and cannot be edited with diff."
+        raise ToolError("File is binary and cannot be edited with diff.")
 
-    try:
-        # Read the file
-        content = read_text(file_path)
-        file_lines = content.splitlines(keepends=True)
-        # Remove trailing newline for processing, add it back later
-        has_trailing_newline = content.endswith("\n") if content else False
-        if has_trailing_newline and file_lines:
-            file_lines[-1] = file_lines[-1].rstrip("\n")
+    # Read the file
+    content = read_text(file_path)
+    file_lines = content.splitlines(keepends=True)
+    # Remove trailing newline for processing, add it back later
+    has_trailing_newline = content.endswith("\n") if content else False
+    if has_trailing_newline and file_lines:
+        file_lines[-1] = file_lines[-1].rstrip("\n")
 
-        # Parse the diff
-        hunks = _parse_diff(diff)
+    # Parse the diff
+    hunks = _parse_diff(diff)
 
-        if not hunks:
-            return "Error: No valid hunks found in diff. Make sure each hunk starts and ends with @@."
+    if not hunks:
+        raise ToolError(
+            "No valid hunks found in diff. Make sure each hunk starts and ends with @@."
+        )
 
-        # Apply each hunk sequentially
-        new_lines = file_lines
-        applied_count = 0
-        failed_hunks = []
+    # Apply each hunk sequentially
+    new_lines = file_lines
+    applied_count = 0
+    failed_hunks = []
 
-        for i, hunk in enumerate(hunks):
-            new_lines, success = _apply_hunk(new_lines, hunk)
-            if success:
-                applied_count += 1
-            else:
-                failed_hunks.append(i)
+    for i, hunk in enumerate(hunks):
+        new_lines, success = _apply_hunk(new_lines, hunk)
+        if success:
+            applied_count += 1
+        else:
+            failed_hunks.append(i)
 
-        if not applied_count:
-            return (
-                "Error: Failed to apply any hunks. The diff content doesn't match "
-                "the file. Try providing more context lines or check for typos."
-            )
+    if not applied_count:
+        raise ToolError(
+            "Failed to apply any hunks. The diff content doesn't match "
+            "the file. Try providing more context lines or check for typos."
+        )
 
-        if failed_hunks:
-            # Don't write the file if any hunks failed - return error
-            return (
-                f"Error: Failed to apply hunks at indices: {failed_hunks}. "
-                f"Applied {applied_count} of {len(hunks)} hunks. "
-                "The file was not modified."
-            )
+    if failed_hunks:
+        # Don't write the file if any hunks failed - return error
+        raise ToolError(
+            f"Failed to apply hunks at indices: {failed_hunks}. "
+            f"Applied {applied_count} of {len(hunks)} hunks. "
+            "The file was not modified."
+        )
 
-        # Reconstruct the file
-        if has_trailing_newline and new_lines:
-            new_lines[-1] = new_lines[-1] + "\n"
-        new_content = "".join(new_lines)
+    # Reconstruct the file
+    if has_trailing_newline and new_lines:
+        new_lines[-1] = new_lines[-1] + "\n"
+    new_content = "".join(new_lines)
 
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(new_content)
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(new_content)
 
-        return f"Successfully applied {applied_count} hunk(s) to {file_path}"
-
-    except Exception as e:
-        return f"Error: {str(e)}"
+    return f"Successfully applied {applied_count} hunk(s) to {file_path}"

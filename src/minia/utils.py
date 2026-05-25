@@ -68,7 +68,7 @@ def build_tool_executor(
             server_id, orig_name = func_name.split(":", 1)
             client = all_clients.get(server_id)
             if client is not None:
-                return await client.call_tool(orig_name, args)
+                return await client.call_tool(orig_name, args, tool_name=func_name)
 
         raise RuntimeError(f"Unknown tool: {func_name}")
 

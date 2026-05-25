@@ -4,7 +4,7 @@ import logging
 import urllib.request
 from typing import Any
 
-from .mcp_instance import mcp
+from .mcp_instance import mcp, ToolError
 
 logger = logging.getLogger(__name__)
 
@@ -27,25 +27,22 @@ def get_current_location() -> dict[str, Any]:
         )
         with urllib.request.urlopen(req, timeout=GEOIP_TIMEOUT) as resp:
             data = json.loads(resp.read().decode())
-
-        if data.get("status") == "success":
-            return {
-                "city": data.get("city", ""),
-                "region": data.get("regionName", ""),
-                "country": data.get("country", ""),
-                "lat": data.get("lat", 0.0),
-                "lon": data.get("lon", 0.0),
-                "timezone": data.get("timezone", ""),
-                "status": "success",
-            }
-        else:
-            return {
-                "status": data.get("status", "unknown"),
-                "error": "IP geolocation service returned unsuccessful status",
-            }
     except Exception as e:
         logger.debug("IP geolocation unavailable: %s", e)
-        return {"status": "error", "error": str(e)}
+        raise ToolError(str(e))
+
+    if data.get("status") != "success":
+        raise ToolError("IP geolocation service returned unsuccessful status")
+
+    return {
+        "city": data.get("city", ""),
+        "region": data.get("regionName", ""),
+        "country": data.get("country", ""),
+        "lat": data.get("lat", 0.0),
+        "lon": data.get("lon", 0.0),
+        "timezone": data.get("timezone", ""),
+        "status": "success",
+    }
 
 
 @mcp.tool()

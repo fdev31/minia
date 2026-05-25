@@ -4,6 +4,7 @@ from .llm_client import get_client
 from minia_config import config
 from .model import LlmContext
 from .logger import logger
+from .serialization import ToolResult, serialize
 from minia import prompts
 
 THINKING_OPEN = "<think>"
@@ -50,14 +51,21 @@ def format_tool_overflow(message: dict, content: str, max_size: int) -> dict:
 
     Returns a message indicating the tool result was too large,
     with a preview so the LLM can understand the data type and refine its query.
+    Uses the configured serialization format.
     """
     preview = content[:1000]
     summarized = dict(message)
-    summarized["content"] = (
-        f"Result too large ({len(content)} chars). "
-        f"Showing first 1000 chars:\n\n"
-        f"{preview}\n\n"
-        f"The result was truncated. Please try a more specific query to narrow the results."
+    summarized["content"] = serialize(
+        ToolResult(
+            status="success",
+            content=(
+                f"Result too large ({len(content)} chars). Showing first 1000 chars:\n\n"
+                f"{preview}\n\n"
+                f"Try a more specific query to narrow the results."
+            ),
+            truncated=True,
+        ),
+        config.llm.tool_format,
     )
     logger.info(
         "[Tool] Result truncated: size=%d > max=%d",
