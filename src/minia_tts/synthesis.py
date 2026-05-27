@@ -7,12 +7,14 @@ import logging
 from minia_tts.cancellation import CancellationToken
 from minia_tts.kokoro.constants import SAMPLE_RATE
 from minia_tts.protocol import TTSState, _send_audio_frames, _send_ok
+from minia_tts.preprocess import preprocess_text
 
 logger = logging.getLogger(__name__)
 
 
 async def _speak_text(writer, state: TTSState, text: str) -> None:
     """Unified text synthesis handler for all output modes."""
+    text = preprocess_text(text)
     logger.info("[TTS] Synthesis started: '%s'", text[:200])
     state.synthesis.speaking = True
     state.synthesis.current_text = text

@@ -3,16 +3,17 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Awaitable, Callable
 
-from .agent import Agent
-from minia_mcp_client import McpClient
-from minia_mcp_client.tool_schemas import (
+from minia_agent.agent import Agent
+from minia_mcp_client.mcp_client import McpClient
+from minia_tools.tool_schemas import (
     LOAD_TOOL_SCHEMA,
     build_delegate_task_schema,
     build_direct_tool_schemas,
 )
-from .model import LlmContext
+from minia_llm.model import LlmContext
 from minia_utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -53,7 +54,7 @@ def build_tool_executor(
                 for sid, client in all_clients.items()
                 for name, _ in client.tool_descriptions
             )
-            return f"Error: Unknown tool '{tool_name}'. Available tools: {available}"
+            return f"Error: Unknown tool '{tool_name}'. Did you forget to use 'load_tool'? Available tools: {available}"
 
         if func_name not in ctx.unfolded_tools:
             if ":" in func_name:
@@ -76,14 +77,13 @@ def build_tool_executor(
 
 
 def _matches_patterns(name: str, patterns: list[str]) -> bool:
-    """Check if a tool name matches any of the given patterns.
+    """Check if a tool name matches any of the given patterns using regex.
 
     Patterns are matched against the full 'server:tool_name' string.
-    Uses simple substring matching: a pattern matches if it appears
-    anywhere in the tool name.
+    Use ^pattern$ for exact matches, or plain patterns for substring matches.
     """
     for pattern in patterns:
-        if pattern in name:
+        if re.search(pattern, name):
             return True
     return False
 
@@ -92,6 +92,7 @@ def build_worker_tools_schema(
     all_clients: list[McpClient],
     whitelist: list[str] | None = None,
     blacklist: list[str] | None = None,
+    global_blacklist: list[str] | None = None,
 ) -> list[dict]:
     """Build tool schemas for a worker agent, filtered by whitelist/blacklist.
 
@@ -104,6 +105,10 @@ def build_worker_tools_schema(
     for client in all_clients:
         for name, desc in client.tool_descriptions:
             full_name = f"{client.server_id}:{name}"
+
+            # Apply global blacklist first (applies to ALL agents)
+            if global_blacklist and _matches_patterns(full_name, global_blacklist):
+                continue
 
             if whitelist and not _matches_patterns(full_name, whitelist):
                 continue
@@ -140,22 +145,45 @@ def build_manager_tools_schema(
     mcp_clients: list[McpClient],
     direct_tool_names: set[str],
     worker_types: list[str] | None = None,
+    global_blacklist: list[str] | None = None,
 ) -> list[dict]:
     """Build tool schemas for the manager agent."""
-    all_descriptions = build_all_tool_descriptions(mcp_clients)
+    all_descriptions = build_all_tool_descriptions(mcp_clients, global_blacklist)
     manager_tools = [build_delegate_task_schema(all_descriptions, worker_types)]
     manager_tools.append(LOAD_TOOL_SCHEMA)
     for mcp_client in mcp_clients:
         manager_tools.extend(build_direct_tool_schemas(mcp_client, direct_tool_names))
+
+    # Apply global blacklist to manager's tools
+    if global_blacklist:
+        filtered_tools = []
+        for tool in manager_tools:
+            tool_name = tool.get("function", {}).get("name", "")
+            if not _matches_patterns(tool_name, global_blacklist):
+                filtered_tools.append(tool)
+        manager_tools = filtered_tools
+
     return manager_tools
 
 
-def build_all_tool_descriptions(mcp_clients: list[McpClient]) -> list[tuple[str, str]]:
-    """Build (prefixed_name, description) pairs for all tools from all servers."""
+def build_all_tool_descriptions(
+    mcp_clients: list[McpClient],
+    global_blacklist: list[str] | None = None,
+) -> list[tuple[str, str]]:
+    """Build (prefixed_name, description) pairs for all tools from all servers.
+
+    Applies global blacklist to filter out excluded tools.
+    """
     descriptions: list[tuple[str, str]] = []
     for mcp_client in mcp_clients:
         for name, desc in mcp_client.tool_descriptions:
-            descriptions.append((f"{mcp_client.server_id}:{name}", desc))
+            full_name = f"{mcp_client.server_id}:{name}"
+
+            # Skip globally blacklisted tools
+            if global_blacklist and _matches_patterns(full_name, global_blacklist):
+                continue
+
+            descriptions.append((full_name, desc))
     return descriptions
 
 

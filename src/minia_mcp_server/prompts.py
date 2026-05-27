@@ -14,8 +14,8 @@ def research_topic(topic: str) -> str:
     Conduct a comprehensive research report on the topic: "{topic}".
 
     # Steps
-    1. **Search**: Use the `search_web` tool to find the top 5 most relevant articles.
-    2. **Read**: Use the `read_web_page` tool to read the content of the top 3 results.
+    1. **Search**: Use the `base:search_web` tool to find the top 5 most relevant articles.
+    2. **Read**: Use the `base:read_web_page` tool to read the content of the top 3 results.
     3. **Synthesize**: Combine the information from the sources to create a detailed report.
 
     # Output Format
@@ -43,7 +43,7 @@ def code_review(file_path: str, focus_area: str = "general") -> str:
     Perform a code review on the file located at: "{file_path}".
 
     # Steps
-    1. **Read**: Use the `file://{file_path}` resource to read the file content.
+    1. **Read**: Use the `{file_path}` resource to read the file content.
     2. **Analyze**: Review the code specifically for issues related to "{focus_area}".
     3. **Suggest**: Provide specific code snippets or recommendations for improvement.
 
@@ -71,7 +71,7 @@ def generate_doc(file_path: str) -> str:
     Generate documentation for the file located at: "{file_path}".
 
     # Steps
-    1. **Read**: Use the `file://{file_path}` resource to read the file content.
+    1. **Read**: Use the `{file_path}` resource to read the file content.
     2. **Analyze**: Identify the main functions, classes, and their docstrings.
     3. **Generate**: Create a markdown documentation.
 

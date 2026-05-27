@@ -53,3 +53,6 @@ class LlmContext:
         default_factory=asyncio.Event,
         repr=False,
     )  # Set by server to cancel in-flight tool calls
+    delegatee_ctx: "LlmContext | None" = (
+        None  # Worker context set during delegation, for cancellation propagation
+    )

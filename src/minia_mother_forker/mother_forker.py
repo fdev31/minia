@@ -73,7 +73,7 @@ class MotherForker:
             *cmd,
             cwd=cwd,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
             env=env,
         )
         logger.info("%s started with PID %s", name, proc.pid)
@@ -88,24 +88,19 @@ class MotherForker:
                 break
             decoded = line.decode("utf-8", errors="replace").rstrip("\n")
             lines.append(decoded)
-            if stream.name == 2:
-                logger.warning("[%s] %s", name, decoded)
-            else:
-                logger.info("[%s] %s", name, decoded)
+            logger.info("[%s] %s", name, decoded)
         return lines
 
     async def _monitor_process(
         self, proc: asyncio.subprocess.Process, name: str
     ) -> None:
         """Monitor a process, log its output, and handle unexpected exits."""
-        stdout_lines: list[str] = []
-        stderr_lines: list[str] = []
+        output_lines: list[str] = []
 
-        reader_stdout = asyncio.create_task(self._read_stream(proc.stdout, name))
-        reader_stderr = asyncio.create_task(self._read_stream(proc.stderr, name))
+        reader = asyncio.create_task(self._read_stream(proc.stdout, name))
 
         await proc.wait()
-        stdout_lines, stderr_lines = await asyncio.gather(reader_stdout, reader_stderr)
+        output_lines = await reader
 
         if not self._shutdown:
             logger.error(
@@ -114,12 +109,9 @@ class MotherForker:
                 proc.pid,
                 proc.returncode,
             )
-            if stdout_lines or stderr_lines:
-                logger.error("=== %s stdout ===", name)
-                for line in stdout_lines:
-                    logger.error("  %s", line)
-                logger.error("=== %s stderr ===", name)
-                for line in stderr_lines:
+            if output_lines:
+                logger.error("=== %s output ===", name)
+                for line in output_lines:
                     logger.error("  %s", line)
                 logger.error("=== end of %s output ===", name)
             await self.shutdown()

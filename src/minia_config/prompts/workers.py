@@ -1,0 +1,72 @@
+"""Worker prompts."""
+
+from .elements import (
+    COMMON_CLOSE,
+    DELEGATION_INSTRUCTION,
+    LOAD_TOOL_INSTRUCTION,
+    TOOL_USAGE_RULES,
+    PHASED_WORKFLOW,
+    WORKER_CODER_PERSONA,
+    WORKER_RESEARCHER_PERSONA,
+    WORKER_DEFAULT_PERSONA,
+)
+
+RESEARCH_WORKER_PROMPT = f"""{WORKER_RESEARCHER_PERSONA}
+
+{PHASED_WORKFLOW}
+
+{COMMON_CLOSE}
+
+{TOOL_USAGE_RULES}
+
+{DELEGATION_INSTRUCTION}
+
+{LOAD_TOOL_INSTRUCTION}
+
+{{tool_result_snippet}}
+
+Available tools:
+{{tool_lines}}
+"""
+
+CODE_WORKER_PROMPT = f"""{WORKER_CODER_PERSONA}
+
+{PHASED_WORKFLOW}
+
+{COMMON_CLOSE}
+
+{TOOL_USAGE_RULES}
+
+{DELEGATION_INSTRUCTION}
+
+{LOAD_TOOL_INSTRUCTION}
+
+{{tool_result_snippet}}
+
+Available tools:
+{{tool_lines}}
+"""
+
+DEFAULT_WORKER_PROMPT = f"""{WORKER_DEFAULT_PERSONA}
+
+{PHASED_WORKFLOW}
+
+{COMMON_CLOSE}
+
+{TOOL_USAGE_RULES}
+
+{DELEGATION_INSTRUCTION}
+
+{LOAD_TOOL_INSTRUCTION}
+
+{{tool_result_snippet}}
+
+Available tools:
+{{tool_lines}}
+"""
+
+BUILTIN_WORKER_PROMPTS: dict[str, str] = {
+    "default": DEFAULT_WORKER_PROMPT,
+    "research": RESEARCH_WORKER_PROMPT,
+    "code": CODE_WORKER_PROMPT,
+}

@@ -5,6 +5,7 @@ import shutil
 
 from .mcp_instance import mcp, ToolError
 from .utils import (
+    DEFAULT_SKIP_DIRS,
     GREP_MAX_FILE_SIZE,
     is_safe_path,
     is_binary,
@@ -15,34 +16,33 @@ from .utils import (
 
 
 @mcp.tool()
-def touch_file(file_path: str):
+def fileTouch(file_path: str):
     """Create an empty file or update its atime"""
     open(file_path, "a+").close()
 
 
 @mcp.tool()
-def read_file(file_path: str, start_line, line_count=20) -> str:
-    """Read lines from a file. Returns content with metadata header."""
+def fileRead(file_path: str, start_line, line_count=1000) -> str:
+    """Read lines from a file (provide start_line for an offset). Returns content with metadata header."""
     if not os.path.exists(file_path):
         raise ToolError(f"File not found at {file_path}")
     if is_binary(file_path):
         raise ToolError("File is binary and cannot be read as text.")
     if os.path.isdir(file_path):
-        raise ToolError("Cannot read a directory, list its content instead")
+        raise ToolError(
+            "Cannot read a directory, use the listDir tool get its content."
+        )
 
     content = read_text(file_path)
     all_lines = content.splitlines(keepends=True)
     total_lines = len(all_lines)
     file_size = len(content.encode("utf-8"))
 
-    start_line = int(start_line) - 1
+    start_line = int(start_line)
     line_count = int(line_count)
 
-    if start_line < 1:
-        raise ToolError("start_line starts counting at 1")
-
     if start_line > total_lines:
-        raise ToolError(f"start_line={start_line} exceeds total {total_lines} lines.")
+        raise ToolError(f"Offset {start_line} exceeds total lines {total_lines}.")
 
     shown_lines = all_lines[start_line : start_line + line_count]
     shown_text = "".join(shown_lines)
@@ -151,17 +151,50 @@ def grep(
 #         return f"Error: {str(e)}"
 
 
+def _get_entry_info(full_path: str, name: str) -> dict:
+    """Get metadata for a single filesystem entry."""
+    try:
+        stat_result = os.lstat(full_path)
+        is_dir = os.path.isdir(full_path)
+        is_file = os.path.isfile(full_path)
+        is_symlink = os.path.islink(full_path)
+
+        entry = {
+            "name": name,
+            "type": "directory" if is_dir else "file",
+            "size": stat_result.st_size if is_file else 0,
+            "modified": stat_result.st_mtime,
+            "is_symlink": is_symlink,
+        }
+        return entry
+    except OSError:
+        return {
+            "name": name,
+            "type": "unknown",
+            "size": 0,
+            "modified": None,
+            "is_symlink": False,
+        }
+
+
 @mcp.tool()
-def list_files(
+def listDir(
     dir_path: str, recursive: bool = False, include_hidden: bool = False
-) -> str:
-    """List files in a directory
+) -> list[dict]:
+    """List files in a directory with metadata.
+
+    Returns a list of dicts, each containing:
+    - name: file/directory name
+    - type: "file" or "directory"
+    - size: size in bytes (for files)
+    - modified: last modification time (Unix timestamp)
+    - is_symlink: whether it's a symbolic link
 
     By default, skips hidden directories (starting with '.'), common build
     artifacts (__pycache__, node_modules, .venv, etc.), and files listed in
     .gitignore.  Use ``include_hidden=True`` to override these defaults.
     """
-    max_files = 40
+    max_entries = 40
     if not is_safe_path(dir_path):
         raise ToolError("Access denied.")
     if not os.path.exists(dir_path):
@@ -169,23 +202,36 @@ def list_files(
     if not os.path.isdir(dir_path):
         raise ToolError(f"{dir_path} is not a directory.")
 
-    files = []
+    results = []
+
     if recursive:
         for rel_path in list_files_filtered(dir_path, include_hidden=include_hidden):
-            files.append(rel_path)
-            if len(files) >= max_files:
+            full_path = os.path.join(dir_path, rel_path)
+            results.append(_get_entry_info(full_path, rel_path))
+            if len(results) >= max_entries:
                 raise ToolError(
-                    f"Too many files found. Limit is {max_files}. Consider narrowing your search."
+                    f"Too many files found. Limit is {max_entries}. Consider narrowing your search."
                 )
-
     else:
-        files = os.listdir(dir_path)
+        try:
+            entries = os.listdir(dir_path)
+        except PermissionError:
+            raise ToolError(f"Permission denied for {dir_path}")
 
-    return "\n".join(files)
+        for name in entries:
+            full_path = os.path.join(dir_path, name)
+            # Apply default skip rules for non-recursive listing
+            if name in DEFAULT_SKIP_DIRS:
+                continue
+            if not include_hidden and name.startswith("."):
+                continue
+            results.append(_get_entry_info(full_path, name))
+
+    return results
 
 
 @mcp.tool()
-def find_files(
+def filesFind(
     dir_path: str,
     pattern: str,
     include_hidden: bool = False,
@@ -212,7 +258,7 @@ def find_files(
 
 
 @mcp.tool()
-def create_directory(dir_path: str, parents: bool = True, exist_ok: bool = True) -> str:
+def mkdir(dir_path: str, parents: bool = True, exist_ok: bool = True) -> str:
     """Create a directory"""
     if not is_safe_path(dir_path):
         raise ToolError("Access denied.")
@@ -221,7 +267,7 @@ def create_directory(dir_path: str, parents: bool = True, exist_ok: bool = True)
 
 
 @mcp.tool()
-def delete_file(file_path: str) -> str:
+def rm(file_path: str) -> str:
     """Delete a file"""
     if not is_safe_path(file_path):
         raise ToolError("Access denied.")
@@ -232,7 +278,20 @@ def delete_file(file_path: str) -> str:
 
 
 @mcp.tool()
-def move_file(src: str, dst: str) -> str:
+def rmdir(dir_path: str) -> str:
+    """Recursively delete a directory and all its contents."""
+    if not is_safe_path(dir_path):
+        raise ToolError("Access denied.")
+    if not os.path.exists(dir_path):
+        raise ToolError(f"Directory not found at {dir_path}")
+    if not os.path.isdir(dir_path):
+        raise ToolError(f"{dir_path} is not a directory.")
+    shutil.rmtree(dir_path)
+    return f"Successfully deleted directory {dir_path}"
+
+
+@mcp.tool()
+def fileMove(src: str, dst: str) -> str:
     """Move/rename a file"""
     if not is_safe_path(src) or not is_safe_path(dst):
         raise ToolError("Access denied.")
@@ -241,7 +300,7 @@ def move_file(src: str, dst: str) -> str:
 
 
 @mcp.tool()
-def copy_file(src: str, dst: str) -> str:
+def fileCopy(src: str, dst: str) -> str:
     """Copy a file"""
     if not is_safe_path(src) or not is_safe_path(dst):
         raise ToolError("Access denied.")
@@ -250,7 +309,7 @@ def copy_file(src: str, dst: str) -> str:
 
 
 @mcp.tool()
-def get_file_info(file_path: str) -> dict:
+def fileInfo(file_path: str) -> dict:
     """Get file metadata"""
     if not is_safe_path(file_path):
         raise ToolError("Access denied.")
@@ -266,3 +325,7 @@ def get_file_info(file_path: str) -> dict:
         "is_dir": os.path.isdir(file_path),
         "is_symlink": os.path.islink(file_path),
     }
+
+
+# Alias for test compatibility
+filesList = listDir

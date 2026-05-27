@@ -13,7 +13,7 @@ from mcp.client.session_group import (  # type: ignore[import-not-found]
 from mcp.types import TextContent  # type: ignore[import-not-found]
 
 from minia_utils.logging import get_logger
-from minia.serialization import ToolResult, serialize
+from minia_llm.serialization import ToolResult, serialize
 from minia_config import config
 
 logger = get_logger(__name__)
@@ -133,6 +133,8 @@ class McpClient:
             len(self._mcp_tools),
             len(self._mcp_prompts),
         )
+        for tool in self._mcp_tools:
+            logger.debug(f"  **{tool.name}**: {tool.description}")
 
     async def _close(self) -> None:
         if self._group:

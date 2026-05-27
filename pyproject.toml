@@ -20,7 +20,7 @@ dependencies = [
 minia = "minia_mother_forker.mother_forker:main"
 minia-client = "minia_client.cli:main"
 
-minia-server = "minia.main:main"
+minia-server = "minia_orch.main:main"
 minia-mcp-server = "minia_mcp_server.main:mcp_server_main"
 minia-tts = "minia_tts.server:main"
 minia-tts-client = "minia_tts.cli:main"

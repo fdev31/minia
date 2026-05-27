@@ -5,10 +5,10 @@ import hashlib
 import json
 from typing import Any
 
-from .llm_client import get_client, Error as LLMAPIError
+from minia_llm.llm_client import get_client, Error as LLMAPIError
 from minia_protocol import EventType
-from .model import ResponseData, LlmContext
-from . import compaction
+from minia_llm.model import ResponseData, LlmContext
+from minia_agent import compaction
 from minia_config import config
 from minia_utils.logging import get_logger
 
@@ -29,7 +29,7 @@ def _empty_retry_msg(ctx: LlmContext) -> str:
         return f"Your previous response was empty again. Available tools: {tools}. Please use one or provide a text answer."
     return (
         "Your previous response was empty for the third time. "
-        "Consider delegating the task to a worker agent, or explain the situation."
+        "Consider delegating to a different worker type, or explain the situation."
     )
 
 
@@ -185,6 +185,9 @@ async def stream_response(ctx: LlmContext):
                 if chunk.usage:
                     ctx.total_tokens = chunk.usage.total_tokens
                     continue
+                if ctx.cancel_requested.is_set():
+                    logger.info("[%s] Cancelling LLM stream due to interrupt", ctx.name)
+                    raise asyncio.CancelledError("LLM stream cancelled by interrupt")
                 if not chunk.choices:
                     continue
                 delta = chunk.choices[0].delta
@@ -390,6 +393,13 @@ async def stream_response(ctx: LlmContext):
             tm = {"role": "tool", "tool_call_id": acc["id"], "content": result}
             tm = await compaction.summarize_message(ctx, tm, tool_result=True)
             tool_results.append(tm)
+
+        # Check if a delegated worker was cancelled by an interrupt
+        if ctx.delegatee_ctx is not None:
+            if ctx.delegatee_ctx.cancel_requested.is_set():
+                logger.info("[%s] Worker was cancelled, aborting stream", ctx.name)
+                raise asyncio.CancelledError("Worker was cancelled by interrupt")
+            ctx.delegatee_ctx = None
 
         # Loop detection
         for acc in other_calls:

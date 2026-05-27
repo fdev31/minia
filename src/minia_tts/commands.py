@@ -20,7 +20,6 @@ from minia_tts.protocol import (
     _send_ok,
 )
 from minia_tts.synthesis import _speak_text
-from minia_tts.preprocess import preprocess_text
 
 logger = logging.getLogger(__name__)
 
@@ -168,7 +167,6 @@ async def _handle_text(writer, state: TTSState, text: str) -> None:
                         await _send_error(writer, "Invalid volume value")
             return
 
-    text = preprocess_text(text)
     await _speak_text(writer, state, text)
 
 

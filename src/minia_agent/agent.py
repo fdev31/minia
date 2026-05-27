@@ -1,8 +1,8 @@
 from minia_protocol import EventType
-from .model import LlmContext
-from . import response_stream
-from . import compaction
-from . import token_estimation
+from minia_llm.model import LlmContext
+from minia_agent import response_stream
+from minia_agent import compaction
+from minia_llm.token_estimation import estimate_tokens
 from minia_utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -17,7 +17,7 @@ class Agent:
             {"role": "system", "content": system_prompt},
             *context.history,
         ]
-        self.context.total_tokens += token_estimation.estimate_tokens(system_prompt)
+        self.context.total_tokens += estimate_tokens(system_prompt)
         logger.info(
             "[%s] Created agent | model=%s | tools=%d | initial_tokens=%d",
             name,

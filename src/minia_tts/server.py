@@ -24,13 +24,71 @@ from minia_tts.kokoro.provider import KokoroTTSProvider
 from minia_tts.output.base import AudioOutput
 from minia_tts.kokoro.constants import KOKORO_VOICES, KOKORO_TO_ISO
 from minia_tts.cancellation import CancellationToken
+from minia_tts.preprocess import preprocess_text
 
 
 logger = logging.getLogger(__name__)
 
 
+async def _ensure_spacy_model() -> None:
+    """Ensure en_core_web_sm spacy model is installed, download if missing."""
+    try:
+        import spacy  # type: ignore[import-not-found]
+
+        spacy.load("en_core_web_sm")
+        return
+    except OSError:
+        pass
+    except ImportError:
+        return
+
+    logger.info("[TTS] en_core_web_sm spacy model not found, installing...")
+    import subprocess
+    import sys
+
+    # spacy download uses `uv pip install` when uv is available, which installs
+    # in uv's own environment rather than the current Python's site-packages.
+    # So we use uv pip install directly with the --python flag to target the
+    # correct environment.
+    model_url = (
+        "https://github.com/explosion/spacy-models/releases/download/"
+        "en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl"
+    )
+    result = subprocess.run(
+        ["uv", "pip", "install", "--python", sys.executable, model_url],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        logger.error(
+            "[TTS] Failed to install en_core_web_sm: %s", result.stderr.strip()
+        )
+        raise RuntimeError(
+            "TTS requires the en_core_web_sm spacy model. "
+            "Install it with: uv run python -m spacy download en_core_web_sm"
+        ) from None
+
+    # Verify the model is now loadable in this process
+    import spacy  # type: ignore[import-not-found]
+
+    try:
+        spacy.load("en_core_web_sm")
+    except OSError as e:
+        logger.error(
+            "[TTS] Model installed but cannot be loaded: %s",
+            e,
+        )
+        raise RuntimeError(
+            "TTS requires the en_core_web_sm spacy model. "
+            "Install it with: uv run python -m spacy download en_core_web_sm"
+        ) from None
+
+    logger.info("[TTS] en_core_web_sm spacy model installed")
+
+
 async def create_provider(config: Any) -> KokoroTTSProvider:
     """Create and warm up the Kokoro TTS provider."""
+    await _ensure_spacy_model()
     provider = KokoroTTSProvider(
         voice=config.voice,
         language=config.language,
@@ -109,7 +167,7 @@ async def _handle_command_client(
         cmd_type = msg.get("type", "")
 
         if cmd_type == TtsCommandType.SYNTHESIZE.value:
-            text = msg.get("content", "")
+            text = preprocess_text(msg.get("content", ""))
             logger.info("[TTS Cmd] Synthesize: '%s'", text[:50])
             await _synthesize_and_broadcast(state, text, audio_clients)
         elif cmd_type == TtsCommandType.STOP.value:

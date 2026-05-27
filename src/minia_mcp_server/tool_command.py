@@ -9,7 +9,7 @@ from .utils import is_safe_path
 
 
 @mcp.tool()
-def execute_command(command: str, cwd: str = "") -> str:
+def run_command(command: str, cwd: str = "") -> str:
     """Execute a shell command"""
     if not cwd:
         cwd = os.getcwd()

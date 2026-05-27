@@ -6,12 +6,12 @@ import signal
 import time
 import uuid
 
-from minia.agent import Agent
+from minia_agent.agent import Agent
 from minia_config import config
 from minia_protocol import EventType
 from minia_sockets.server import SOCKET_DISCONNECT_ERRORS
-from .llm_client import TimeoutError, ConnectionError
-from . import compaction
+from minia_llm.llm_client import TimeoutError, ConnectionError
+from minia_agent import compaction
 from minia_utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -181,7 +181,8 @@ async def _interrupt_and_requeue(queue, clients, agents, reason: str):
     """
     logger.info("[Server] Interrupting: %s", reason)
     # Signal in-flight tool calls to cancel
-    agents[0].context.cancel_requested.set()
+    for agent in agents:
+        agent.context.cancel_requested.set()
     _flush_partial_text(agents[0])
     recent = await _drain_queue_and_broadcast(queue, clients)
     for msg in recent:
@@ -227,9 +228,11 @@ async def process_loop(queue: asyncio.Queue, clients: list, agents: list[Agent])
                 (time.monotonic() - t0) * 1000,
             )
         except asyncio.CancelledError:
-            # Tool execution was cancelled by interrupt — clear the flag
-            agents[0].context.cancel_requested.clear()
-            logger.info("[Server] Streaming interrupted by tool cancellation")
+            for agent in agents:
+                _flush_partial_text(agent)
+                agent.context.cancel_requested.clear()
+            agents[0].context.delegatee_ctx = None
+            logger.info("[Server] Streaming interrupted by LLM cancellation")
         except ConnectionError as e:
             logger.exception("[Server] LLM connection error: %s", e)
             await _broadcast(

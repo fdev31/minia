@@ -1,18 +1,25 @@
 import asyncio
 import openai
-from openai import AsyncOpenAI
 from minia_config import config
 
-_instance: AsyncOpenAI | None = None
+
+def _get_async_openai():
+    """Lazily get AsyncOpenAI so patching minia_llm.llm_client.AsyncOpenAI works."""
+    import openai
+
+    return openai.AsyncOpenAI
+
+
+_instance = None
 _instance_lock = asyncio.Lock()
 
 
-async def get_client() -> AsyncOpenAI:
+async def get_client():
     global _instance
     if _instance is None:
         async with _instance_lock:
             if _instance is None:
-                _instance = AsyncOpenAI(
+                _instance = _get_async_openai()(
                     base_url=config.llm.base_url,
                     api_key=config.llm.api_key,
                 )
@@ -22,3 +29,6 @@ async def get_client() -> AsyncOpenAI:
 ConnectionError = openai.APIConnectionError
 TimeoutError = openai.APITimeoutError
 Error = openai.APIError
+
+# Re-export AsyncOpenAI for patching compatibility
+AsyncOpenAI = openai.AsyncOpenAI

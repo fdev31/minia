@@ -1,10 +1,10 @@
 import json
+from typing import Any
 
-from .llm_client import get_client
+from minia_llm.llm_client import get_client
 from minia_config import config
-from .model import LlmContext
-from .serialization import ToolResult, serialize
-from minia import prompts
+from minia_llm.model import LlmContext
+from minia_llm.serialization import ToolResult, serialize
 from minia_utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -48,7 +48,9 @@ def parse_thinking_blocks(text: str) -> tuple[str, str | None]:
     return answer, thinking
 
 
-def format_tool_overflow(message: dict, content: str, max_size: int) -> dict:
+def format_tool_overflow(
+    message: dict[str, Any], content: str, max_size: int
+) -> dict[str, Any]:
     """Format a truncated tool result overflow notice.
 
     Returns a message indicating the tool result was too large,
@@ -78,8 +80,8 @@ def format_tool_overflow(message: dict, content: str, max_size: int) -> dict:
 
 
 async def summarize_message(
-    ctx: LlmContext, message: dict, tool_result: bool = False
-) -> dict:
+    ctx: LlmContext, message: dict[str, Any], tool_result: bool = False
+) -> dict[str, Any]:
     """Summarize a large message via the LLM.
 
     For other messages, calls the LLM to summarize while preserving key facts.
@@ -106,7 +108,7 @@ async def summarize_message(
         max_size,
     )
 
-    summary_prompt = prompts.SUMMARY_PROMPT + content
+    summary_prompt = config.prompts.SUMMARY_PROMPT + content
 
     try:
         response = await (await get_client()).chat.completions.create(
@@ -215,7 +217,10 @@ async def compact_history(ctx: LlmContext, force: bool = False) -> str | None:
             model=ctx.model,
             parallel_tool_calls=config.llm.parallel_tool_calls,
             messages=[
-                {"role": "user", "content": prompts.SUMMARY_PROMPT + summary_content}
+                {
+                    "role": "user",
+                    "content": config.prompts.SUMMARY_PROMPT + summary_content,
+                }
             ],
             max_tokens=config.llm.compaction_max_tokens,
         )
